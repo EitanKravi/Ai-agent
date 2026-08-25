@@ -1,7 +1,11 @@
 import os
+import json
 from dotenv import load_dotenv
 from openai import OpenAI
 import argparse
+
+from prompts import system_prompt
+from call_function import available_functions, call_function
 
 
 def main():
@@ -27,6 +31,7 @@ def main():
     )
 
     messages = [
+        {"role": "system", "content": system_prompt},
         {"role": "user", "content": args.user_prompt},
     ]
 
@@ -34,6 +39,8 @@ def main():
     response = client.chat.completions.create(
         model="openrouter/free",
         messages=messages,
+        temperature=0,
+        tools=available_functions,
     )
 
     # Give error if didn't get response
@@ -48,9 +55,21 @@ def main():
         print("Prompt tokens: ", response.usage.prompt_tokens)
         print("Response tokens: ", response.usage.completion_tokens)
 
+
     # print the response
     print("Response:")
     print(response.choices[0].message.content)
+
+    # Catching what tool to use
+    message = response.choices[0].message
+
+    if message.tool_calls is not None and len(message.tool_calls) > 0:
+        for tool_call in message.tool_calls:
+            result_message = call_function(tool_call, args.verbose)
+            if args.verbose:
+                print(f"-> {result_message['content']}")
+
+
 
 
 if __name__ == "__main__":

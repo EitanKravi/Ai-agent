@@ -1,6 +1,28 @@
 import os
 import subprocess
 
+schema_run_python_file = {
+    "type": "function",
+    "function": {
+        "name": "run_python_file",
+        "description": "The software executes Python code from the file located in the specified directory—relative to the working directory—",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "file_path": {
+                    "type": "string",
+                    "description": "The path to the file from which the content will be returned, relative to the working directory.",
+                },
+                "args": {
+                    "type": "array",
+                    "description": "The args if the python code need args",
+                },
+            },
+        },
+    },
+}
+
+
 def run_python_file(
     working_directory: str, file_path: str, args: list[str] | None = None
 ) -> str:
