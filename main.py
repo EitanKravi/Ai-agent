@@ -8,6 +8,51 @@ from prompts import system_prompt
 from call_function import available_functions, call_function
 
 
+def chat_respond(client, messages: list[dict], args):
+    response = client.chat.completions.create(
+        model="openrouter/free",
+        messages=messages,
+        temperature=0,
+        tools=available_functions,
+    )
+
+    # Give error if didn't get response
+    if response.usage.completion_tokens is None:
+        raise RuntimeError()
+
+    # print info about the response and the user prompt
+    if args.verbose:
+        print("User prompt: ", args.user_prompt)
+
+        print("Prompt tokens: ", response.usage.prompt_tokens)
+        print("Response tokens: ", response.usage.completion_tokens)
+
+    # print the response
+    if response.choices[0].message.content is not None:
+        print("Response:")
+        print(response.choices[0].message.content)
+
+    # Catching what tool to use
+    message = response.choices[0].message
+
+    # add message to messages
+    messages.append(message)
+
+    if message.tool_calls is not None and len(message.tool_calls) > 0:
+        for tool_call in message.tool_calls:
+            result_message = call_function(tool_call, args.verbose)
+            if args.verbose:
+                print(f"-> {result_message['content']}")
+
+            # add the result of the call_function to messages
+            messages.append(result_message)
+
+        # To continue the loop
+        return True
+    else:
+        # To end the loop when there is no more tool_calls
+        return False
+
 def main():
     # Get API key
     load_dotenv()
@@ -35,40 +80,19 @@ def main():
         {"role": "user", "content": args.user_prompt},
     ]
 
+    run: bool = True
+    get_final_result: bool = False
+
     # Get response from the AI agent
-    response = client.chat.completions.create(
-        model="openrouter/free",
-        messages=messages,
-        temperature=0,
-        tools=available_functions,
-    )
+    for _ in range(20):
+        run = chat_respond(client, messages, args)
+        if not run:
+            get_final_result = True
+            break
 
-    # Give error if didn't get response
-    if response.usage.completion_tokens is None:
-        raise RuntimeError()
-
-
-    # print info about the response and the user prompt
-    if args.verbose:
-        print("User prompt: ", args.user_prompt)
-
-        print("Prompt tokens: ", response.usage.prompt_tokens)
-        print("Response tokens: ", response.usage.completion_tokens)
-
-
-    # print the response
-    print("Response:")
-    print(response.choices[0].message.content)
-
-    # Catching what tool to use
-    message = response.choices[0].message
-
-    if message.tool_calls is not None and len(message.tool_calls) > 0:
-        for tool_call in message.tool_calls:
-            result_message = call_function(tool_call, args.verbose)
-            if args.verbose:
-                print(f"-> {result_message['content']}")
-
+    if not get_final_result:
+        print("Maximum number of runs reached and not receive final response")
+        exit(1)
 
 
 
